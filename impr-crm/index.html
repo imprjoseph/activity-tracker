@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>imPR CRM · 客戶與供應商管理系統</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+TC:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+<body data-theme="dark">
+
+<!-- ══════════════════════════════════════════ LOGIN SCREEN ══ -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-bg">
+    <div class="login-grid"></div>
+    <div class="login-glow"></div>
+  </div>
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="brand-mark">iP</div>
+      <div class="brand-text">
+        <span class="brand-name">imPR</span>
+        <span class="brand-sub">CRM · Vendor Management System</span>
+      </div>
+    </div>
+    <div class="login-form">
+      <div class="form-group">
+        <label>帳號</label>
+        <input type="text" id="loginUser" placeholder="username" autocomplete="username" />
+      </div>
+      <div class="form-group">
+        <label>密碼</label>
+        <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+      <div id="loginError" class="login-error hidden">帳號或密碼錯誤</div>
+      <button class="btn-login" onclick="handleLogin()">
+        <span>登入系統</span>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <div class="login-footer">© 2025 新動力公共關係顧問 imPR · 內部系統</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ APP SHELL ══════ -->
+<div id="appShell" class="app-shell hidden">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-brand">
+        <div class="brand-mark sm">iP</div>
+        <span class="sidebar-title">imPR CRM</span>
+      </div>
+      <button class="sidebar-toggle" onclick="toggleSidebar()">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 5h12M3 9h12M3 13h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">主選單</div>
+      <a class="nav-item active" data-page="dashboard" onclick="navigate('dashboard')">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="10" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="10" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="10" y="10" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+        <span>Dashboard</span>
+      </a>
+
+      <div class="nav-section-label">客戶管理</div>
+      <a class="nav-item" data-page="clients" onclick="navigate('clients')">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="6" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 15c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span>客戶列表</span>
+        <span class="nav-badge" id="badge-clients">0</span>
+      </a>
+      <a class="nav-item" data-page="contacts" onclick="navigate('contacts')">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M12 2H6a2 2 0 00-2 2v10a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2z" stroke="currentColor" stroke-width="1.5"/><path d="M9 7a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM6.5 12c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span>聯絡人</span>
+      </a>
+
+      <div class="nav-section-label">供應商管理</div>
+      <a class="nav-item" data-page="vendors" onclick="navigate('vendors')">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 6l6-4 6 4v9a1 1 0 01-1 1H4a1 1 0 01-1-1V6z" stroke="currentColor" stroke-width="1.5"/><path d="M7 16V10h4v6" stroke="currentColor" stroke-width="1.5"/></svg>
+        <span>供應商列表</span>
+        <span class="nav-badge" id="badge-vendors">0</span>
+      </a>
+      <a class="nav-item" data-page="evaluations" onclick="navigate('evaluations')">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2l2.09 4.26L16 7.27l-3.5 3.41.83 4.82L9 13.09l-4.33 2.41.83-4.82L2 7.27l4.91-.01L9 2z" stroke="currentColor" stroke-width="1.5"/></svg>
+        <span>供應商評價</span>
+      </a>
+
+      <div class="nav-section-label">業務追蹤</div>
+      <a class="nav-item" data-page="activities" onclick="navigate('activities')">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2v14M2 9h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="9" cy="9" r="7" stroke="currentColor" stroke-width="1.5"/></svg>
+        <span>追蹤紀錄</span>
+      </a>
+      <a class="nav-item" data-page="projects" onclick="navigate('projects')">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="4" width="14" height="11" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M6 4V3a1 1 0 011-1h4a1 1 0 011 1v1" stroke="currentColor" stroke-width="1.5"/><path d="M6 9h6M6 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span>專案關聯</span>
+      </a>
+
+      <div class="nav-section-label">系統</div>
+      <a class="nav-item" data-page="settings" onclick="navigate('settings')">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M9 2v1.5M9 14.5V16M2 9h1.5M14.5 9H16M4.1 4.1l1.06 1.06M12.84 12.84l1.06 1.06M4.1 13.9l1.06-1.06M12.84 5.16l1.06-1.06" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span>系統設定</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="theme-toggle" onclick="toggleTheme()">
+        <svg id="themeIcon" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1v1M8 14v1M1 8h1M14 8h1M3.05 3.05l.7.7M12.25 12.25l.7.7M3.05 12.95l.7-.7M12.25 3.75l.7-.7M8 5a3 3 0 100 6 3 3 0 000-6z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span id="themeLabel">淺色模式</span>
+      </button>
+      <div class="user-info">
+        <div class="user-avatar" id="userAvatar">A</div>
+        <div class="user-meta">
+          <span class="user-name" id="userName">Admin</span>
+          <span class="user-role" id="userRole">Super Admin</span>
+        </div>
+        <button class="btn-logout" onclick="handleLogout()" title="登出">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 2h2a2 2 0 012 2v8a2 2 0 01-2 2h-2M7 11l3-3-3-3M10 8H2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content" id="mainContent">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="page-title" id="pageTitle">Dashboard</h1>
+        <div class="breadcrumb" id="breadcrumb">首頁 / Dashboard</div>
+      </div>
+      <div class="topbar-right">
+        <div class="search-bar">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <input type="text" id="globalSearch" placeholder="全域搜尋客戶、供應商、聯絡人…" onkeyup="handleGlobalSearch(this.value)" />
+        </div>
+        <button class="btn-primary" id="topbarAction" onclick="openCreateModal()">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span id="topbarActionLabel">新增客戶</span>
+        </button>
+        <div class="notification-bell">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2a5 5 0 00-5 5v3l-1.5 2.5h13L14 10V7a5 5 0 00-5-5z" stroke="currentColor" stroke-width="1.4"/><path d="M7.5 15.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <span class="notif-dot"></span>
+        </div>
+      </div>
+    </header>
+
+    <div class="page-content" id="pageContent">
+      <!-- Dynamic content injected here -->
+    </div>
+  </main>
+</div>
+
+<!-- ══════════════════════════════════════════ MODALS ══════── -->
+<div id="modalOverlay" class="modal-overlay hidden" onclick="closeModal(event)">
+  <div class="modal" id="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modalTitle">新增客戶</h2>
+      <button class="modal-close" onclick="closeModal()">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M4 4l10 10M14 4L4 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter">
+      <button class="btn-secondary" onclick="closeModal()">取消</button>
+      <button class="btn-primary" id="modalSubmit" onclick="submitModal()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toastContainer" class="toast-container"></div>
+
+<!-- SCRIPTS -->
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/api.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/pages/dashboard.js"></script>
+<script src="js/pages/clients.js"></script>
+<script src="js/pages/vendors.js"></script>
+<script src="js/pages/contacts.js"></script>
+<script src="js/pages/activities.js"></script>
+<script src="js/pages/projects.js"></script>
+<script src="js/pages/settings.js"></script>
+<script src="js/modals.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
