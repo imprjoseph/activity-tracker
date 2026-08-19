@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <?!= include_("src/client/Styles"); ?>
+  </head>
+  <body>
+    <div id="loading" class="loading-screen">
+      <div class="loading-mark"><span></span><span></span><span></span></div>
+      <strong>正在整理活動進度…</strong>
+    </div>
+
+    <div id="app" class="app-shell is-hidden">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">會</div>
+          <div><strong>活動追蹤</strong><span>Conference Ops</span></div>
+        </div>
+        <nav id="nav">
+          <button class="nav-item active" data-view="dashboard"><span>⌂</span>總覽</button>
+          <button class="nav-item" data-view="events"><span>▦</span>活動與任務</button>
+          <button class="nav-item" data-view="my-work"><span>✓</span>我的工作</button>
+          <button class="nav-item" data-view="assignments"><span>↗</span>主管交辦</button>
+          <button class="nav-item" data-view="reports"><span>◔</span>統計報表</button>
+          <button class="nav-item manager-only" data-view="admin"><span>⚙</span>管理後台</button>
+        </nav>
+        <div class="sidebar-foot">
+          <div class="avatar" id="user-avatar">U</div>
+          <div class="user-meta"><strong id="user-name">—</strong><span id="user-role">—</span></div>
+        </div>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <button id="menu-toggle" class="icon-button mobile-only" aria-label="開啟選單">☰</button>
+          <div><p class="eyebrow" id="page-eyebrow">TODAY'S OPERATIONS</p><h1 id="page-title">專案總覽</h1></div>
+          <div class="topbar-actions">
+            <button class="button ghost" id="refresh-button">更新資料</button>
+            <button class="button primary pm-only" data-action="new-event">＋ 建立活動</button>
+          </div>
+        </header>
+
+        <section id="view-dashboard" class="view active">
+          <div class="hero-strip">
+            <div><span class="signal">LIVE</span><h2>先處理風險，再追百分比。</h2><p>同時檢視完整性、逾期、準時率與距活動日，避免單一數字掩蓋風險。</p></div>
+            <div class="hero-date"><span id="today-weekday">—</span><strong id="today-date">—</strong></div>
+          </div>
+          <div id="metric-cards" class="metric-grid"></div>
+          <div class="content-grid two-one">
+            <article class="panel"><div class="panel-head"><div><span class="kicker">EVENT PULSE</span><h3>活動健康度</h3></div><button class="text-button" data-view-link="events">查看全部 →</button></div><div id="dashboard-events"></div></article>
+            <article class="panel focus-panel"><div class="panel-head"><div><span class="kicker">FOCUS</span><h3>今日優先順序</h3></div></div><div id="focus-list"></div></article>
+          </div>
+        </section>
+
+        <section id="view-events" class="view">
+          <div class="split-layout">
+            <aside class="event-rail panel">
+              <div class="panel-head"><div><span class="kicker">PROJECTS</span><h3>活動列表</h3></div><button class="icon-button pm-only" data-action="new-event">＋</button></div>
+              <label class="search-box">⌕<input id="event-search" type="search" placeholder="搜尋活動"></label>
+              <div id="event-list" class="event-list"></div>
+            </aside>
+            <article id="event-detail" class="event-detail panel empty-state"><div><span class="empty-icon">▦</span><h3>選擇一個活動</h3><p>查看任務、完整性檢核與匯入歷程。</p></div></article>
+          </div>
+        </section>
+
+        <section id="view-my-work" class="view">
+          <div class="section-heading"><div><span class="kicker">PERSONAL QUEUE</span><h2>我的工作</h2><p>按截止日排序，逾期與今日到期會優先顯示。</p></div></div>
+          <article class="panel"><div id="my-work-list"></div></article>
+        </section>
+
+        <section id="view-assignments" class="view">
+          <div class="section-heading"><div><span class="kicker">DIRECT ASSIGNMENTS</span><h2>主管交辦</h2><p>逾期事項預設於 09:00、13:00、18:00 提醒，完成後立即停止。</p></div><button class="button primary pm-only" data-action="new-assignment">＋ 新增交辦</button></div>
+          <article class="panel"><div id="assignment-list"></div></article>
+        </section>
+
+        <section id="view-reports" class="view">
+          <div class="section-heading"><div><span class="kicker">PERFORMANCE</span><h2>統計報表</h2><p>取消與不適用事項不進分母；準時率以原截止日計算。</p></div><button class="button ghost" id="export-report">下載 CSV</button></div>
+          <div class="content-grid half"><article class="panel"><div class="panel-head"><h3>案件指標</h3></div><div id="report-events"></div></article><article class="panel"><div class="panel-head"><h3>人員指標</h3></div><div id="report-owners"></div></article></div>
+        </section>
+
+        <section id="view-admin" class="view manager-only">
+          <div class="section-heading"><div><span class="kicker">SYSTEM CONTROL</span><h2>管理後台</h2><p>提醒規則預設保持測試模式，驗證收件人與內容後再切換正式寄送。</p></div></div>
+          <div class="content-grid half">
+            <article class="panel"><div class="panel-head"><h3>提醒設定</h3></div><div id="reminder-rules"></div></article>
+            <article class="panel"><div class="panel-head"><h3>寄送前檢查</h3></div><div class="admin-check"><span class="admin-icon">✉</span><h4>先預覽，不直接寄送</h4><p id="reminder-preview">載入中…</p><button class="button ghost" id="preview-reminders">重新檢查</button></div></article>
+          </div>
+          <div class="content-grid half admin-log">
+            <article class="panel"><div class="panel-head"><h3>使用者與角色</h3><button class="text-button admin-only" data-action="new-user">＋ 新增使用者</button></div><div id="user-list"></div></article>
+            <article class="panel"><div class="panel-head"><h3>資料備份</h3></div><div class="admin-check"><span class="admin-icon">↻</span><h4>每日自動備份</h4><p id="backup-status">最近備份：尚未備份</p><button class="button ghost admin-only" data-action="backup-now">立即建立備份</button></div></article>
+          </div>
+          <article class="panel admin-log"><div class="panel-head"><h3>最近寄送紀錄</h3><button class="text-button" id="load-reminder-log">重新整理</button></div><div id="reminder-log"></div></article>
+        </section>
+      </main>
+    </div>
+
+    <div id="modal-root"></div>
+    <div id="toast" class="toast" role="status"></div>
+    <?!= include_("src/client/App"); ?>
+  </body>
+</html>

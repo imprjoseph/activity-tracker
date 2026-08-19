@@ -1,0 +1,10 @@
+{
+  "scriptId": "請填入開發環境 Apps Script ID",
+  "rootDir": ".",
+  "filePushOrder": [
+    "src/shared/constants.js",
+    "src/shared/core.js",
+    "src/server/Database.gs",
+    "src/server/Auth.gs"
+  ]
+}

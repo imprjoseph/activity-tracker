@@ -1,0 +1,306 @@
+<script>
+(() => {
+  "use strict";
+
+  const state = { boot: null, view: "dashboard", event: null, myWork: [], assignments: [], importSession: null };
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+  const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[char]);
+  const fmtDate = (value) => value ? String(value).slice(0, 10).replace(/-/g, "/") : "—";
+  const todayKey = () => { const parts = Object.fromEntries(new Intl.DateTimeFormat("en", {timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date()).map((part) => [part.type,part.value])); return `${parts.year}-${parts.month}-${parts.day}`; };
+  const pct = (value) => `${Number(value || 0).toFixed(Number(value || 0) % 1 ? 1 : 0)}%`;
+  const role = () => state.boot?.user?.role;
+  const isManager = () => ["admin", "boss"].includes(role());
+  const canManage = () => ["admin", "boss", "pm"].includes(role());
+
+  function gs(name, ...args) {
+    return new Promise((resolve, reject) => {
+      if (!window.google?.script?.run) return reject(new Error("此頁需從 Google Apps Script Web App 開啟。"));
+      google.script.run.withSuccessHandler(resolve).withFailureHandler((error) => reject(new Error(error?.message || String(error))))[name](...args);
+    });
+  }
+
+  function toast(message, error = false) {
+    const node = $("#toast");
+    node.textContent = message;
+    node.className = `toast show${error ? " error" : ""}`;
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => node.className = "toast", 3200);
+  }
+
+  function setBusy(button, busy, label = "處理中…") {
+    if (!button) return;
+    if (busy) { button.dataset.label = button.textContent; button.textContent = label; button.disabled = true; }
+    else { button.textContent = button.dataset.label || button.textContent; button.disabled = false; }
+  }
+
+  function statusBadge(status) {
+    const kind = ["完成", "已完成", "已確認"].includes(status) ? "" : ["待確認", "規劃中", "進行中"].includes(status) ? "warn" : ["逾期", "未檢核"].includes(status) ? "alert" : "neutral";
+    return `<span class="badge ${kind}">${esc(status || "—")}</span>`;
+  }
+
+  async function boot() {
+    try {
+      state.boot = await gs("bootstrapApp");
+      const user = state.boot.user;
+      $("#user-name").textContent = user.name || user.email;
+      $("#user-role").textContent = state.boot.roleLabels[user.role] || user.role;
+      $("#user-avatar").textContent = (user.name || user.email || "U").slice(0, 1).toUpperCase();
+      $$(".manager-only").forEach((node) => node.style.display = isManager() ? "" : "none");
+      $$(".pm-only").forEach((node) => node.style.display = canManage() ? "" : "none");
+      $$(".admin-only").forEach((node) => node.style.display = role() === "admin" ? "" : "none");
+      $("#loading").classList.add("is-hidden");
+      $("#app").classList.remove("is-hidden");
+      renderAll();
+      await Promise.all([loadMyWork(), loadAssignments()]);
+      if (isManager()) loadReminderPreview();
+    } catch (error) {
+      $("#loading").innerHTML = `<div class="empty-icon">!</div><strong>無法開啟系統</strong><p style="max-width:520px;color:#6d818a;line-height:1.7">${esc(error.message)}</p><p style="font-size:12px;color:#87979e">首次使用請由管理員在 Apps Script 編輯器執行 setupTracker()。</p>`;
+    }
+  }
+
+  function renderAll() {
+    renderDashboard();
+    renderEventList();
+    renderReports();
+    renderAdmin();
+    const today = new Date();
+    $("#today-weekday").textContent = today.toLocaleDateString("zh-TW", { weekday: "long" });
+    $("#today-date").textContent = today.toLocaleDateString("zh-TW", { month: "2-digit", day: "2-digit" });
+  }
+
+  function renderDashboard() {
+    const dashboard = state.boot.dashboard;
+    const cards = [
+      ["進行中活動", dashboard.eventCount, "目前納入追蹤", ""],
+      ["目前逾期", dashboard.overall.overdue, "截止日已到且未完成", dashboard.overall.overdue ? "alert" : ""],
+      ["完整性警示", dashboard.completenessAlerts, "未檢核或待確認", dashboard.completenessAlerts ? "warn" : ""],
+      ["整體準時率", pct(dashboard.overall.onTimeRate), "以原截止日計算", ""]
+    ];
+    $("#metric-cards").innerHTML = cards.map(([label, value, note, kind]) => `<article class="metric-card ${kind}"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join("");
+    const rows = dashboard.byEvent.slice(0, 7);
+    $("#dashboard-events").innerHTML = rows.length ? `<div class="data-row header"><span>活動</span><span>完成率</span><span>逾期</span><span>完整性</span></div>${rows.map((event) => `<div class="data-row"><div><strong>${esc(event.name)}</strong><span class="sub">${fmtDate(event.event_date)} · ${event.days_to_event >= 0 ? `還有 ${event.days_to_event} 天` : `已過 ${Math.abs(event.days_to_event)} 天`}</span></div><div>${pct(event.metrics.completionRate)}<div class="progress"><span style="width:${Math.min(event.metrics.completionRate,100)}%"></span></div></div><strong style="color:${event.metrics.overdue ? "var(--red)" : "inherit"}">${event.metrics.overdue}</strong>${statusBadge(event.completeness_status)}</div>`).join("")}` : empty("尚無活動資料");
+    const risks = [...rows].sort((a,b) => (b.metrics.overdue - a.metrics.overdue) || (a.days_to_event - b.days_to_event)).slice(0, 4);
+    $("#focus-list").innerHTML = risks.length ? risks.map((event, index) => `<div class="focus-item"><span class="focus-rank">${index + 1}</span><div><strong>${esc(event.name)}</strong><p>${event.metrics.overdue ? `${event.metrics.overdue} 項逾期` : "目前無逾期"}；完整性為「${esc(event.completeness_status)}」；距活動日 ${event.days_to_event} 天。</p></div></div>`).join("") : `<div class="focus-item"><span class="focus-rank">✓</span><div><strong>目前沒有風險資料</strong><p>建立活動並匯入追蹤表後，系統會自動排序。</p></div></div>`;
+  }
+
+  function renderEventList(filter = "") {
+    const events = state.boot.events.filter((event) => event.name.toLowerCase().includes(filter.toLowerCase()));
+    $("#event-list").innerHTML = events.length ? events.map((event) => `<button class="event-card ${state.event?.event?.event_id === event.event_id ? "active" : ""}" data-event-id="${esc(event.event_id)}"><div class="event-meta"><strong>${esc(event.name)}</strong>${event.metrics.overdue ? `<span class="badge alert">${event.metrics.overdue}</span>` : ""}</div><span>${fmtDate(event.event_date)} · ${esc(event.status)}</span><div class="progress"><span style="width:${Math.min(event.metrics.completionRate,100)}%"></span></div></button>`).join("") : empty("沒有符合的活動");
+  }
+
+  async function openEvent(eventId) {
+    const container = $("#event-detail");
+    container.className = "event-detail panel empty-state";
+    container.innerHTML = `<div><div class="loading-mark"><span></span><span></span><span></span></div><p>載入活動資料…</p></div>`;
+    try {
+      state.event = await gs("getEventDetail", eventId);
+      renderEventList($("#event-search").value);
+      renderEventDetail();
+    } catch (error) { toast(error.message, true); }
+  }
+
+  function renderEventDetail() {
+    const {event, tasks, metrics, selectedCategoryIds, checklist, importBatches, members} = state.event;
+    const container = $("#event-detail");
+    container.className = "event-detail panel";
+    container.innerHTML = `
+      <div class="event-head"><div><span class="kicker">${esc(event.event_id)}</span><h2>${esc(event.name)}</h2><p>${fmtDate(event.event_date)} · 專案經理 ${esc(event.pm)} · ${esc(event.status)}</p></div><div class="event-actions"><button class="button ghost small pm-only" data-action="edit-event">編輯</button><button class="button primary small pm-only" data-action="new-task">＋ 任務</button></div></div>
+      <div class="event-stats"><div class="event-stat"><span>完成率</span><strong>${pct(metrics.completionRate)}</strong></div><div class="event-stat"><span>準時率</span><strong>${pct(metrics.onTimeRate)}</strong></div><div class="event-stat"><span>目前逾期</span><strong style="color:${metrics.overdue ? "var(--red)" : "inherit"}">${metrics.overdue}</strong></div><div class="event-stat"><span>完整性</span><strong style="font-size:14px">${esc(event.completeness_status)}</strong></div></div>
+      <div class="tabs"><button class="tab active" data-tab="tasks">任務 ${tasks.length}</button><button class="tab" data-tab="checklist">完整性檢核</button><button class="tab" data-tab="members">成員權限 ${members.length}</button><button class="tab" data-tab="imports">匯入紀錄</button></div>
+      <div class="tab-panel active" data-panel="tasks"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div><span class="kicker">TRACKING ITEMS</span><h3 style="margin:5px 0 0">工作事項</h3></div><button class="button ghost small pm-only" data-action="open-import">匯入 Excel／CSV</button></div>${renderTasks(tasks)}</div>
+      <div class="tab-panel" data-panel="checklist"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px"><div><span class="kicker">SCOPE CHECK</span><h3 style="margin:5px 0 0">適用大項</h3></div><div class="event-actions"><button class="button ghost small pm-only" data-action="save-categories">儲存並重新檢核</button><button class="button teal small pm-only" data-action="confirm-checklist">確認檢核完成</button></div></div><div class="category-grid">${state.boot.categories.map((category) => `<label class="category-check"><input type="checkbox" name="event-category" value="${esc(category.category_id)}" ${selectedCategoryIds.includes(category.category_id) ? "checked" : ""}><span>${esc(category.name)}</span></label>`).join("")}</div><div style="margin-top:24px"><span class="kicker">CHECK RESULTS</span><h3 style="margin:5px 0 14px">檢核結果</h3>${renderChecklist(checklist)}</div></div>
+      <div class="tab-panel" data-panel="members">${renderMembers(members)}</div>
+      <div class="tab-panel" data-panel="imports"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><h3>最近匯入批次</h3><button class="button primary small pm-only" data-action="open-import">＋ 新增匯入</button></div>${renderImports(importBatches)}</div>`;
+    $$(".pm-only", container).forEach((node) => node.style.display = canManage() ? "" : "none");
+  }
+
+  function renderTasks(tasks) {
+    if (!tasks.length) return empty("尚無追蹤事項，可手動新增或匯入 Excel／CSV。");
+    return `<div class="task-table"><div class="task-row header"><span>追蹤項目</span><span>負責人</span><span>截止日</span><span>狀態</span><span></span></div>${tasks.map((task) => { const overdue = !["完成","取消","不適用"].includes(task.status) && task.due < todayKey(); return `<div class="task-row ${overdue ? "overdue" : ""}"><strong>${esc(task.item)}</strong><span>${esc(task.owner_email || "未指派")}</span><span>${fmtDate(task.due)}</span>${statusBadge(overdue ? "逾期" : task.status)}<button class="text-button" data-edit-task="${esc(task.task_id)}">編輯</button></div>`; }).join("")}</div>`;
+  }
+
+  function renderChecklist(items) {
+    if (!items.length) return empty("請先勾選本案適用的大項。");
+    return items.map((item) => `<div class="check-alert ${item.status === "covered" || item.status === "not_applicable" ? "covered" : ""}"><div><h4>${item.status === "covered" ? "✓" : item.status === "not_applicable" ? "—" : "!"} ${esc(item.concept)}</h4><p>${item.status === "covered" ? "現有追蹤事項已找到相關內容" : item.status === "not_applicable" ? `已標示不適用：${esc(item.reason)}` : `未找到關鍵字：${item.keywords.map(esc).join("、")}`}</p></div>${item.status === "missing" ? `<div class="check-actions pm-only"><button class="button ghost small" data-ignore-concept="${esc(item.concept)}" data-category="${esc(item.categoryId)}">不適用</button><button class="button teal small" data-add-concept="${esc(item.concept)}" data-category="${esc(item.categoryId)}">補成任務</button></div>` : ""}</div>`).join("");
+  }
+
+  function renderImports(batches) {
+    if (!batches.length) return empty("尚無匯入紀錄。");
+    return `<div class="task-table"><div class="task-row header" style="grid-template-columns:1.5fr 1fr 1fr 1fr 72px"><span>檔案</span><span>模式</span><span>操作者</span><span>時間</span><span></span></div>${batches.map((batch) => `<div class="task-row" style="grid-template-columns:1.5fr 1fr 1fr 1fr 72px"><strong>${esc(batch.file_name)}</strong><span>${batch.mode === "tracker" ? "更新追蹤表" : "更新進度"}</span><span>${esc(batch.created_by)}</span><span>${esc(String(batch.created_at).replace("T"," ").slice(0,16))}</span><a class="text-button" href="${esc(batch.file_ref)}" target="_blank">原檔</a></div>`).join("")}</div>`;
+  }
+
+  function renderMembers(members) {
+    const options = (state.boot.users || []).filter((user) => String(user.active) !== "false").map((user) => `<option value="${esc(user.user_id)}">${esc(user.name || user.email)} · ${esc(user.email)}</option>`).join("");
+    const editor = canManage() ? `<div class="member-editor"><label class="field"><span>使用者</span><select id="member-user"><option value="">請選擇</option>${options}</select></label><label class="field"><span>案件權限</span><select id="member-permission"><option value="view">唯讀</option><option value="edit">可編輯</option><option value="manage">可管理成員</option><option value="none">移除權限</option></select></label><button class="button teal small" data-action="save-member">儲存權限</button></div>` : "";
+    const labels = {view:"唯讀",edit:"可編輯",manage:"可管理成員"};
+    const rows = members.length ? `<div class="data-row header"><span>成員</span><span>Email</span><span>權限</span><span>加入時間</span></div>${members.map((member) => `<div class="data-row"><strong>${esc(member.name || member.user_id)}</strong><span>${esc(member.email || "—")}</span><span>${esc(labels[member.permission] || member.permission)}</span><span>${esc(String(member.created_at || "").replace("T"," ").slice(0,16))}</span></div>`).join("")}` : empty("尚未加入案件成員；專案經理仍保有完整案件權限。");
+    return `<div><span class="kicker">ACCESS CONTROL</span><h3 style="margin:5px 0 14px">案件成員與權限</h3>${editor}${rows}</div>`;
+  }
+
+  async function loadMyWork() {
+    try { state.myWork = await gs("listMyWork"); renderMyWork(); } catch (error) { toast(error.message, true); }
+  }
+
+  function renderMyWork() {
+    $("#my-work-list").innerHTML = state.myWork.length ? `<div class="work-row header"><span>任務</span><span>活動</span><span>截止日</span><span>狀態</span><span>操作</span></div>${state.myWork.map((task) => `<div class="work-row"><div><strong>${esc(task.item)}</strong><span class="sub">${esc(task.notes || "無備註")}</span></div><span>${esc(task.event_name)}</span><strong style="color:${task.is_overdue ? "var(--red)" : "inherit"}">${fmtDate(task.due)}</strong>${statusBadge(task.is_overdue ? "逾期" : task.status)}<button class="text-button" data-my-task="${esc(task.task_id)}">更新</button></div>`).join("")}` : empty("目前沒有指派給你的任務。");
+  }
+
+  async function loadAssignments() {
+    try { state.assignments = await gs("listAssignments"); renderAssignments(); } catch (error) { toast(error.message, true); }
+  }
+
+  function renderAssignments() {
+    $("#assignment-list").innerHTML = state.assignments.length ? `<div class="work-row header"><span>交辦事項</span><span>受指派人</span><span>期限</span><span>狀態</span><span>操作</span></div>${state.assignments.map((item) => `<div class="work-row"><div><strong>${esc(item.title)}</strong><span class="sub">${esc(item.priority)} · ${esc(item.notes || "無備註")}</span></div><span>${esc(item.owner_emails)}</span><strong style="color:${item.is_overdue ? "var(--red)" : "inherit"}">${fmtDate(item.due)}</strong>${statusBadge(item.is_overdue ? "逾期" : item.status)}${item.status !== "完成" ? `<button class="text-button" data-complete-assignment="${esc(item.assignment_id)}">完成</button>` : "<span>—</span>"}</div>`).join("")}` : empty("目前沒有主管交辦事項。");
+  }
+
+  function renderReports() {
+    const dash = state.boot.dashboard;
+    $("#report-events").innerHTML = dash.byEvent.length ? `<div class="data-row header"><span>活動</span><span>完成率</span><span>準時率</span><span>逾期</span></div>${dash.byEvent.map((event) => `<div class="data-row"><strong>${esc(event.name)}</strong><span>${pct(event.metrics.completionRate)}</span><span>${pct(event.metrics.onTimeRate)}</span><strong>${event.metrics.overdue}</strong></div>`).join("")}` : empty("尚無案件資料");
+    $("#report-owners").innerHTML = dash.byOwner.length ? `<div class="data-row header"><span>人員</span><span>完成率</span><span>準時率</span><span>逾期</span></div>${dash.byOwner.map((owner) => `<div class="data-row"><strong>${esc(owner.owner)}</strong><span>${pct(owner.metrics.completionRate)}</span><span>${pct(owner.metrics.onTimeRate)}</span><strong>${owner.metrics.overdue}</strong></div>`).join("")}` : empty("尚無人員資料");
+  }
+
+  function renderAdmin() {
+    if (!isManager()) return;
+    $("#reminder-rules").innerHTML = state.boot.reminderRules.map((rule) => `<form class="rule-card" data-rule-id="${esc(rule.rule_id)}"><h4>${rule.scope === "tasks" ? "活動追蹤表事項" : "主管直接交辦"}</h4><p>${rule.scope === "tasks" ? "同一人同一活動合併為一封摘要" : "依設定時段提醒，完成後停止"}</p><div class="rule-grid"><label>寄送時段<input name="times" value="${esc(rule.times)}"></label><label>主管副知<input name="cc" type="email" value="${esc(rule.cc)}" placeholder="boss@example.com"></label><label>測試收件人<input name="test_recipient" type="email" value="${esc(rule.test_recipient)}" placeholder="test@example.com"></label><label>每日上限<input name="daily_limit" type="number" min="1" max="500" value="${esc(rule.daily_limit)}"></label></div><label class="confirm-line"><input name="test_mode" type="checkbox" ${String(rule.test_mode) !== "false" ? "checked" : ""}>測試模式（正式上線前建議保持勾選）</label><label class="confirm-line"><input name="enabled" type="checkbox" ${String(rule.enabled) !== "false" ? "checked" : ""}>啟用此規則</label><button class="button ghost small" type="submit" style="margin-top:12px">儲存設定</button></form>`).join("");
+    const users = state.boot.users || [];
+    $("#user-list").innerHTML = users.length ? `<div class="data-row header"><span>姓名</span><span>帳號</span><span>角色</span><span>狀態</span></div>${users.map((user) => `<button class="data-row user-row" data-edit-user="${esc(user.user_id)}"><strong>${esc(user.name)}</strong><span title="${esc(user.email)}">${esc(user.email)}</span><span>${esc(state.boot.roleLabels[user.role] || user.role)}</span>${statusBadge(String(user.active) === "false" ? "停權" : "啟用")}</button>`).join("")}` : empty("尚無使用者資料");
+    $("#backup-status").textContent = `最近備份：${String(state.boot.systemStatus?.lastBackupAt || "尚未備份").replace("T"," ")}`;
+    $$(".admin-only").forEach((node) => node.style.display = role() === "admin" ? "" : "none");
+  }
+
+  async function loadReminderPreview() {
+    try { const data = await gs("previewReminderRun"); $("#reminder-preview").textContent = `截至 ${data.today}，共有 ${data.dueTasks} 項活動任務、${data.dueAssignments} 項主管交辦符合提醒條件。此檢查不會寄信。`; } catch (error) { $("#reminder-preview").textContent = error.message; }
+  }
+
+  function empty(message) { return `<div class="empty-list">${esc(message)}</div>`; }
+
+  function navigate(view) {
+    if (view === "admin" && !isManager()) return;
+    state.view = view;
+    const titles = {dashboard:["TODAY'S OPERATIONS","專案總覽"],events:["PROJECT CONTROL","活動與任務"],"my-work":["PERSONAL QUEUE","我的工作"],assignments:["DIRECT ASSIGNMENTS","主管交辦"],reports:["PERFORMANCE","統計報表"],admin:["SYSTEM CONTROL","管理後台"]};
+    $$(".view").forEach((node) => node.classList.toggle("active", node.id === `view-${view}`));
+    $$(".nav-item").forEach((node) => node.classList.toggle("active", node.dataset.view === view));
+    $("#page-eyebrow").textContent = titles[view][0]; $("#page-title").textContent = titles[view][1];
+    $(".sidebar").classList.remove("open");
+  }
+
+  function showModal(title, body, {large = false, submitLabel = "儲存", onSubmit = null} = {}) {
+    const root = $("#modal-root");
+    root.innerHTML = `<div class="modal-backdrop"><form class="modal ${large ? "large" : ""}"><div class="modal-head"><h3>${esc(title)}</h3><button class="icon-button" type="button" data-close-modal>×</button></div><div class="modal-body">${body}</div><div class="modal-foot"><button class="button ghost" type="button" data-close-modal>取消</button>${onSubmit ? `<button class="button primary" type="submit">${esc(submitLabel)}</button>` : ""}</div></form></div>`;
+    const form = $("form", root);
+    if (onSubmit) form.addEventListener("submit", async (event) => { event.preventDefault(); const button = $("button[type=submit]", form); setBusy(button, true); try { await onSubmit(new FormData(form), form); } catch (error) { toast(error.message, true); setBusy(button, false); } });
+  }
+
+  function closeModal() { $("#modal-root").innerHTML = ""; state.importSession = null; }
+
+  function eventModal(event = {}) {
+    showModal(event.event_id ? "編輯活動" : "建立活動", `<div class="form-grid"><input type="hidden" name="event_id" value="${esc(event.event_id || "")}"><input type="hidden" name="version" value="${esc(event.version || "")}"><label class="field full"><span>活動名稱 *</span><input name="name" required value="${esc(event.name || "")}" placeholder="例如：2026 年度論壇"></label><label class="field"><span>活動日期 *</span><input name="event_date" type="date" required value="${esc(event.event_date || "")}"></label><label class="field"><span>狀態</span><select name="status">${state.boot.eventStatuses.map((status) => `<option ${status === (event.status || "進行中") ? "selected" : ""}>${esc(status)}</option>`).join("")}</select></label><label class="field full"><span>專案經理 Email</span><input name="pm" type="email" value="${esc(event.pm || state.boot.user.email)}"></label></div>`, {onSubmit: async (data) => { await gs("saveEvent", Object.fromEntries(data)); closeModal(); await refresh(); toast("活動已儲存"); }});
+  }
+
+  function taskModal(task = {}) {
+    const eventId = task.event_id || state.event?.event?.event_id;
+    showModal(task.task_id ? "更新任務" : "新增任務", `<div class="form-grid"><input type="hidden" name="task_id" value="${esc(task.task_id || "")}"><input type="hidden" name="version" value="${esc(task.version || "")}"><input type="hidden" name="event_id" value="${esc(eventId)}"><label class="field full"><span>追蹤項目 *</span><input name="item" required value="${esc(task.item || "")}"></label><label class="field"><span>負責人 Email</span><input name="owner_email" type="email" value="${esc(task.owner_email || state.boot.user.email)}"></label><label class="field"><span>截止日 *</span><input name="due" type="date" required value="${esc(task.due || "")}"></label><label class="field"><span>狀態</span><select name="status">${state.boot.taskStatuses.map((status) => `<option ${status === (task.status || "未開始") ? "selected" : ""}>${esc(status)}</option>`).join("")}</select></label><label class="field"><span>追蹤大項</span><select name="category_id"><option value="">未分類</option>${state.boot.categories.map((category) => `<option value="${esc(category.category_id)}" ${category.category_id === task.category_id ? "selected" : ""}>${esc(category.name)}</option>`).join("")}</select></label><label class="field full"><span>備註</span><textarea name="notes">${esc(task.notes || "")}</textarea></label></div>`, {onSubmit: async (data) => { const saved = await gs("saveTask", Object.fromEntries(data)); closeModal(); await openEvent(saved.event_id); await refreshBootOnly(); toast("任務已更新"); }});
+  }
+
+  function assignmentModal() {
+    showModal("新增主管交辦", `<div class="form-grid"><label class="field full"><span>交辦事項 *</span><input name="title" required></label><label class="field full"><span>受指派人 Email（多人以逗號分隔）*</span><input name="owner_emails" required placeholder="user1@example.com, user2@example.com"></label><label class="field"><span>期限 *</span><input name="due" type="date" required></label><label class="field"><span>優先級</span><select name="priority"><option>一般</option><option>高</option><option>緊急</option></select></label><label class="field"><span>關聯活動</span><select name="event_id"><option value="">一般交辦</option>${state.boot.events.map((event) => `<option value="${esc(event.event_id)}">${esc(event.name)}</option>`).join("")}</select></label><label class="field"><span>提醒時段</span><input name="reminder_times" value="09:00,13:00,18:00"></label><label class="field full"><span>備註</span><textarea name="notes"></textarea></label></div>`, {onSubmit: async (data) => { await gs("saveAssignment", Object.fromEntries(data)); closeModal(); await loadAssignments(); toast("主管交辦已建立"); }});
+  }
+
+  function userModal(user = {}) {
+    const roles = Object.entries(state.boot.roleLabels).map(([value,label]) => `<option value="${esc(value)}" ${value === (user.role || "staff") ? "selected" : ""}>${esc(label)}</option>`).join("");
+    showModal(user.user_id ? "編輯使用者" : "新增使用者", `<div class="form-grid"><input type="hidden" name="user_id" value="${esc(user.user_id || "")}"><label class="field"><span>姓名 *</span><input name="name" required value="${esc(user.name || "")}"></label><label class="field"><span>Email *</span><input name="email" type="email" required value="${esc(user.email || "")}" ${user.user_id ? "readonly" : ""}></label><label class="field"><span>角色</span><select name="role">${roles}</select></label><label class="confirm-line"><input name="active" type="checkbox" ${String(user.active) !== "false" ? "checked" : ""}>啟用帳號</label></div>`, {onSubmit: async (data, form) => { const input = Object.fromEntries(data); input.active = $("[name=active]",form).checked; await gs("saveUser",input); closeModal(); await refreshBootOnly(); toast("使用者已儲存"); }});
+  }
+
+  function importModal() {
+    const event = state.event.event;
+    showModal("匯入追蹤表", `<div class="stepper"><span class="step active"></span><span class="step"></span><span class="step"></span></div><div id="import-content"><div class="modal-note">「更新追蹤表」會新增、更新並標記移除，且重新進行完整性檢核；「更新進度」只更新日期、狀態、負責人與備註，不會刪除既有事項。</div><div class="form-grid"><label class="field full"><span>活動</span><input value="${esc(event.name)}" disabled></label><label class="field"><span>上傳模式</span><select id="import-mode"><option value="tracker">更新追蹤表</option><option value="progress">更新進度</option></select></label><label class="field"><span>檔案（CSV／XLSX／XLS）</span><input id="import-file" type="file" accept=".csv,.xlsx,.xls" required></label></div></div>`, {large:true, submitLabel:"讀取欄位", onSubmit: inspectFile});
+  }
+
+  async function inspectFile(data, form) {
+    const file = $("#import-file", form).files[0];
+    if (!file) throw new Error("請選擇檔案。");
+    const base64 = await fileToBase64(file);
+    const result = await gs("inspectImportFile", {eventId:state.event.event.event_id,fileName:file.name,mimeType:file.type,base64});
+    state.importSession = {token:result.token, mode:$("#import-mode", form).value, tabs:result.tabs, fileName:file.name};
+    renderMappingStep(form);
+  }
+
+  function renderMappingStep(form) {
+    const session = state.importSession; const tab = session.tabs[0];
+    $$(".step", form).forEach((node,index) => node.classList.toggle("active", index <= 1));
+    $("#import-content", form).innerHTML = `<div class="form-grid"><label class="field full"><span>工作表</span><select id="import-sheet">${session.tabs.map((tab) => `<option>${esc(tab.name)}</option>`).join("")}</select></label></div><div id="mapping-fields">${mappingHtml(tab)}</div>`;
+    const submit = $("button[type=submit]", form); submit.textContent = "產生差異預覽"; submit.disabled = false; submit.dataset.label = "產生差異預覽";
+    form.onsubmit = async (event) => { event.preventDefault(); setBusy(submit,true); try { await previewFile(form); } catch(error) {toast(error.message,true);setBusy(submit,false);} };
+    $("#import-sheet", form).addEventListener("change", (event) => { const next = session.tabs.find((tab) => tab.name === event.target.value); $("#mapping-fields",form).innerHTML = mappingHtml(next); });
+  }
+
+  function mappingHtml(tab) {
+    return state.boot.importFields.map((field) => `<div class="mapping-row"><label>${esc(field.label)}${field.required ? " *" : ""}</label><select data-map-field="${esc(field.key)}"><option value="">不匯入</option>${tab.headers.map((header) => `<option value="${esc(header)}" ${tab.detectedMapping[field.key] === header ? "selected" : ""}>${esc(header)}</option>`).join("")}</select></div>`).join("");
+  }
+
+  async function previewFile(form) {
+    const mapping = {}; $$('[data-map-field]',form).forEach((select) => mapping[select.dataset.mapField] = select.value);
+    const request = {token:state.importSession.token,mode:state.importSession.mode,sheetName:$("#import-sheet",form).value,mapping};
+    const preview = await gs("previewImport", request); state.importSession.request = request; state.importSession.preview = preview;
+    $$(".step", form).forEach((node) => node.classList.add("active"));
+    const s = preview.summary;
+    $("#import-content",form).innerHTML = `<div class="modal-note">請確認差異摘要後再寫入。原始檔、操作者、時間與變更摘要都會保留。</div><div class="preview-cards"><div class="preview-card"><strong>${s.added}</strong><span>新增</span></div><div class="preview-card"><strong>${s.updated}</strong><span>更新</span></div><div class="preview-card"><strong>${s.unchanged}</strong><span>不變</span></div><div class="preview-card warn"><strong>${s.unknown}</strong><span>未知／略過</span></div><div class="preview-card warn"><strong>${s.duplicates}</strong><span>重複</span></div><div class="preview-card ${s.conflicts ? "alert" : ""}"><strong>${s.conflicts}</strong><span>衝突／保留系統值</span></div><div class="preview-card ${s.removed ? "alert" : ""}"><strong>${s.removed}</strong><span>標記移除</span></div></div>${s.conflicts ? `<div class="modal-note" style="background:var(--red-soft);color:var(--red);margin-top:15px">有 ${s.conflicts} 項在上次匯入後曾由系統內修改，本次不會自動覆蓋或移除：${preview.conflicts.slice(0,5).map((item) => esc(item.item)).join("、")}</div>` : ""}${preview.errors.length ? `<div class="modal-note" style="background:var(--red-soft);color:var(--red);margin-top:15px">有 ${preview.errors.length} 列錯誤，需先修正原檔：${preview.errors.slice(0,3).map((error) => `第 ${error.row} 列 ${error.messages.join("、")}`).join("；")}</div>` : ""}${s.requiresDestructiveConfirm ? `<label class="confirm-line"><input id="confirm-removal" type="checkbox">我了解本次將標記移除超過 20% 的既有事項，並確認差異摘要正確。</label>` : ""}`;
+    const submit = $("button[type=submit]",form); submit.textContent = preview.errors.length ? "請先修正檔案" : "確認寫入"; submit.disabled = !!preview.errors.length; submit.dataset.label = submit.textContent;
+    form.onsubmit = async (event) => { event.preventDefault(); setBusy(submit,true,"寫入中…"); try { const request = {...state.importSession.request, confirmLargeRemoval:!!$("#confirm-removal",form)?.checked}; const result = await gs("confirmImport",request); state.event = result.event; closeModal(); renderEventDetail(); await refreshBootOnly(); toast(`匯入完成：新增 ${result.summary.added}、更新 ${result.summary.updated}、衝突保留 ${result.summary.conflicts}`); } catch(error){toast(error.message,true);setBusy(submit,false);} };
+  }
+
+  const fileToBase64 = (file) => new Promise((resolve,reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(",")[1]); reader.onerror = reject; reader.readAsDataURL(file); });
+
+  async function refreshBootOnly() { state.boot = await gs("bootstrapApp"); renderAll(); }
+  async function refresh() { const eventId = state.event?.event?.event_id; await refreshBootOnly(); if (eventId) await openEvent(eventId); await Promise.all([loadMyWork(),loadAssignments()]); }
+
+  document.addEventListener("click", async (event) => {
+    const nav = event.target.closest("[data-view]"); if (nav) navigate(nav.dataset.view);
+    const link = event.target.closest("[data-view-link]"); if (link) navigate(link.dataset.viewLink);
+    const eventCard = event.target.closest("[data-event-id]"); if (eventCard) openEvent(eventCard.dataset.eventId);
+    if (event.target.closest("[data-close-modal]") || (event.target.classList.contains("modal-backdrop"))) closeModal();
+    const action = event.target.closest("[data-action]")?.dataset.action;
+    if (action === "new-event") eventModal();
+    if (action === "edit-event") eventModal(state.event.event);
+    if (action === "new-task") taskModal();
+    if (action === "new-assignment") assignmentModal();
+    if (action === "new-user") userModal();
+    if (action === "open-import") importModal();
+    if (action === "save-categories") {
+      const ids = $$('[name="event-category"]:checked', $("#event-detail")).map((input) => input.value);
+      setBusy(event.target,true); try { state.event = await gs("saveEventCategories",state.event.event.event_id,ids); renderEventDetail(); await refreshBootOnly(); toast("大項已儲存並重新檢核"); } catch(error){toast(error.message,true);setBusy(event.target,false);}
+    }
+    if (action === "confirm-checklist") {
+      setBusy(event.target,true); try { state.event = await gs("confirmChecklist",state.event.event.event_id); renderEventDetail(); await refreshBootOnly(); toast("完整性檢核已確認"); } catch(error){toast(error.message,true);setBusy(event.target,false);}
+    }
+    if (action === "save-member") {
+      const userId = $("#member-user")?.value; const permission = $("#member-permission")?.value;
+      if (!userId) { toast("請先選擇使用者",true); return; }
+      setBusy(event.target,true); try { await gs("saveEventMember",{event_id:state.event.event.event_id,user_id:userId,permission}); await openEvent(state.event.event.event_id); toast("案件權限已更新"); } catch(error){toast(error.message,true);setBusy(event.target,false);}
+    }
+    const taskId = event.target.closest("[data-edit-task]")?.dataset.editTask || event.target.closest("[data-my-task]")?.dataset.myTask;
+    if (taskId) { const task = state.event?.tasks?.find((item) => item.task_id === taskId) || state.myWork.find((item) => item.task_id === taskId); taskModal(task); }
+    const conceptButton = event.target.closest("[data-add-concept]"); if (conceptButton) { setBusy(conceptButton,true); try { await gs("addSuggestedTask",{eventId:state.event.event.event_id,categoryId:conceptButton.dataset.category,concept:conceptButton.dataset.addConcept}); await openEvent(state.event.event.event_id); await refreshBootOnly(); toast("已新增建議任務"); } catch(error){toast(error.message,true);setBusy(conceptButton,false);} }
+    const ignoreButton = event.target.closest("[data-ignore-concept]"); if (ignoreButton) { const reason = prompt("請填寫不適用原因："); if (!reason) return; try { state.event = await gs("saveChecklistDecision",{eventId:state.event.event.event_id,categoryId:ignoreButton.dataset.category,concept:ignoreButton.dataset.ignoreConcept,status:"not_applicable",reason}); renderEventDetail(); toast("已保留不適用原因"); } catch(error){toast(error.message,true);} }
+    const assignmentId = event.target.closest("[data-complete-assignment]")?.dataset.completeAssignment; if (assignmentId) { try { await gs("completeAssignment",assignmentId); await loadAssignments(); toast("交辦事項已完成，後續提醒將停止"); } catch(error){toast(error.message,true);} }
+    const userId = event.target.closest("[data-edit-user]")?.dataset.editUser; if (userId && role() === "admin") { const user = (state.boot.users || []).find((item) => item.user_id === userId); if (user) userModal(user); }
+    if (action === "backup-now") { setBusy(event.target,true,"備份中…"); try { const result = await gs("createBackupNow"); await refreshBootOnly(); toast(`備份完成：保留 ${result.retainedDays} 天`); } catch(error){toast(error.message,true);setBusy(event.target,false);} }
+  });
+
+  document.addEventListener("submit", async (event) => {
+    const ruleForm = event.target.closest(".rule-card"); if (!ruleForm) return; event.preventDefault(); const button = $("button[type=submit]",ruleForm); setBusy(button,true); const data = Object.fromEntries(new FormData(ruleForm)); data.rule_id = ruleForm.dataset.ruleId; data.enabled = $("[name=enabled]",ruleForm).checked; data.test_mode = $("[name=test_mode]",ruleForm).checked; try { const saved = await gs("saveReminderRule",data); const index = state.boot.reminderRules.findIndex((item) => item.rule_id === saved.rule_id); state.boot.reminderRules[index] = saved; renderAdmin(); toast("提醒設定已儲存，排程已更新"); } catch(error){toast(error.message,true);setBusy(button,false);}
+  });
+
+  document.addEventListener("change", (event) => { if (event.target.matches("#event-search")) renderEventList(event.target.value); });
+  $("#event-search").addEventListener("input", (event) => renderEventList(event.target.value));
+  $("#refresh-button").addEventListener("click", async (event) => { setBusy(event.target,true); try { await refresh(); toast("資料已更新"); } catch(error){toast(error.message,true);} finally {setBusy(event.target,false);} });
+  $("#menu-toggle").addEventListener("click", () => $(".sidebar").classList.toggle("open"));
+  $("#preview-reminders").addEventListener("click", loadReminderPreview);
+  $("#load-reminder-log").addEventListener("click", async () => { try { const rows = await gs("getReminderLog",100); $("#reminder-log").innerHTML = rows.length ? `<div class="data-row header"><span>收件人</span><span>結果</span><span>時間</span><span>批次</span></div>${rows.map((row) => `<div class="data-row"><strong>${esc(row.recipient)}</strong>${statusBadge(row.result === "sent" ? "完成" : "失敗")}<span>${esc(String(row.sent_at).replace("T"," ").slice(0,16))}</span><span>${esc(row.batch_id)}</span></div>`).join("")}` : empty("尚無寄送紀錄"); } catch(error){toast(error.message,true);} });
+  $("#export-report").addEventListener("click", () => { const lines = [["活動","完成率","準時率","逾期數","完整性"],...state.boot.dashboard.byEvent.map((e) => [e.name,e.metrics.completionRate,e.metrics.onTimeRate,e.metrics.overdue,e.completeness_status])]; const csv = "\uFEFF" + lines.map((row) => row.map((cell) => `"${String(cell).replace(/"/g,'""')}"`).join(",")).join("\n"); const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})); link.download = `活動統計_${todayKey()}.csv`; link.click(); URL.revokeObjectURL(link.href); });
+  document.addEventListener("click", (event) => { const tab = event.target.closest(".tab"); if (!tab) return; const root = tab.closest(".event-detail"); $$(".tab",root).forEach((node) => node.classList.toggle("active",node === tab)); $$(".tab-panel",root).forEach((node) => node.classList.toggle("active",node.dataset.panel === tab.dataset.tab)); });
+
+  boot();
+})();
+</script>

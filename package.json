@@ -1,0 +1,13 @@
+{
+  "name": "conference-activity-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "會議活動完整性檢核與期限督辦系統（Google Apps Script MVP）",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check src/shared/constants.js && node --check src/shared/core.js && npm test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
