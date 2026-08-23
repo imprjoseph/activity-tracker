@@ -10,7 +10,7 @@ const CONFIG = {
 
   // ── System Info ──────────────────────────────────────────────
   APP_NAME: 'imPR CRM',
-  APP_VERSION: '1.2.0',
+  APP_VERSION: '1.3.1',
   COMPANY: '新動力公共關係顧問股份有限公司',
 
   // ── Spreadsheet Sheet Names ──────────────────────────────────
