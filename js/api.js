@@ -1,6 +1,6 @@
 /* ════════════════════════════════════════════════════════════
    api.js — Google Apps Script API Communication Layer
-   v1.3 Fix: isDemoMode 現在會讀取 localStorage 的 GAS URL
+   v1.4：跨網域 fetch 失敗時自動改用 JSONP
    ════════════════════════════════════════════════════════════ */
 
 const API = (() => {
@@ -17,6 +17,48 @@ const API = (() => {
   // ── Demo 模式判斷（同時檢查 config 及 localStorage）─────────
   function isDemoMode() {
     return getEndpoint().includes('YOUR_DEPLOYMENT_ID');
+  }
+
+  function jsonpCall(endpoint, payload, timeoutMs = 10000) {
+    return new Promise((resolve, reject) => {
+      const callback = '__imprJsonp_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+      const script = document.createElement('script');
+      const url = new URL(endpoint);
+      let settled = false;
+
+      Object.keys(payload).forEach(k =>
+        url.searchParams.set(k, typeof payload[k] === 'string' ? payload[k] : JSON.stringify(payload[k]))
+      );
+      url.searchParams.set('callback', callback);
+
+      const cleanup = () => {
+        delete window[callback];
+        script.remove();
+      };
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(new Error('GAS JSONP 連線逾時'));
+      }, timeoutMs);
+
+      window[callback] = data => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        cleanup();
+        resolve(data);
+      };
+      script.onerror = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        cleanup();
+        reject(new Error('GAS JSONP 載入失敗'));
+      };
+      script.src = url.toString();
+      document.head.appendChild(script);
+    });
   }
 
   // ── Core GAS Call（含 10 秒逾時保護）────────────────────────
@@ -44,12 +86,21 @@ const API = (() => {
     try {
       let fetchPromise;
       if (READ_ACTIONS.includes(action)) {
-        const url = new URL(endpoint);
-        Object.keys(payload).forEach(k =>
-          url.searchParams.set(k, typeof payload[k] === 'string' ? payload[k] : JSON.stringify(payload[k]))
-        );
-        fetchPromise = fetch(url.toString(), { method: 'GET' })
-          .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); });
+        if (action === 'login') {
+          // 登入直接用 JSONP，避免 Safari／企業防火牆封鎖跨網域 fetch。
+          fetchPromise = jsonpCall(endpoint, payload);
+        } else {
+          const url = new URL(endpoint);
+          Object.keys(payload).forEach(k =>
+            url.searchParams.set(k, typeof payload[k] === 'string' ? payload[k] : JSON.stringify(payload[k]))
+          );
+          fetchPromise = fetch(url.toString(), { method: 'GET' })
+            .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+            .catch(fetchError => {
+              console.warn(`[API] ${action} fetch failed; retrying with JSONP:`, fetchError.message);
+              return jsonpCall(endpoint, payload);
+            });
+        }
       } else {
         fetchPromise = fetch(endpoint, {
           method:  'POST',
