@@ -6,6 +6,15 @@
 const Auth = (() => {
   const SESSION_KEY = 'impr_crm_session';
 
+  // 統一帳號格式：全形轉半形、移除複製時夾帶的空白，並忽略大小寫。
+  function normalizeUsername(value) {
+    return String(value || '')
+      .normalize('NFKC')
+      .trim()
+      .replace(/\s+/g, '')
+      .toLowerCase();
+  }
+
   function getSession() {
     try {
       const raw = sessionStorage.getItem(SESSION_KEY);
@@ -32,14 +41,13 @@ const Auth = (() => {
     return role.permissions.includes(perm);
   }
 
-  // ── Login：永遠先比對本機 DEMO_USERS，成功就直接登入 ─────────
-  // GAS Users Sheet 驗證為「未來擴充」，目前不啟用
-  // 原因：GAS Users Sheet 需要先手動新增帳號才能使用，
-  //       貿然呼叫會造成等待超時卡死
+  // ── Login：先比對本機帳號，再由 GAS Users Sheet 驗證 ──────────
   async function login(username, password) {
+    const normalizedUsername = normalizeUsername(username);
+
     // Step 1：本機帳號驗證（永遠有效，包含 GAS 連線後）
     const localUser = CONFIG.DEMO_USERS.find(
-      u => u.username === username && u.password === password
+      u => normalizeUsername(u.username) === normalizedUsername && u.password === password
     );
     if (localUser) {
       const sessionUser = {
@@ -52,13 +60,12 @@ const Auth = (() => {
     }
 
     // Step 2：若本機驗證失敗 + GAS 已連線，嘗試 GAS Users Sheet
-    const gasUrl = localStorage.getItem('impr_gas_url') || '';
-    const hasGAS  = gasUrl && !gasUrl.includes('YOUR_DEPLOYMENT_ID');
+    const hasGAS = typeof API !== 'undefined' && !API.getStatus().isDemoMode;
 
     if (hasGAS) {
       try {
         const res = await Promise.race([
-          API.call('login', { username, password }),
+          API.call('login', { username: normalizedUsername, password }),
           new Promise((_, reject) =>
             setTimeout(() => reject(new Error('GAS 連線逾時（8秒）')), 8000)
           ),
@@ -70,7 +77,13 @@ const Auth = (() => {
         return { success: false, message: res?.message || '帳號或密碼錯誤' };
       } catch (e) {
         console.warn('[Auth] GAS login failed:', e.message);
-        return { success: false, message: `帳號密碼錯誤（GAS：${e.message}）` };
+        const networkError = /Failed to fetch|NetworkError|Load failed/i.test(e.message || '');
+        return {
+          success: false,
+          message: networkError
+            ? '無法連線至帳號資料庫，請確認網路後再試'
+            : `登入服務暫時無法使用：${e.message}`,
+        };
       }
     }
 
@@ -82,17 +95,19 @@ const Auth = (() => {
     window.location.reload();
   }
 
-  return { getSession, setSession, clearSession, hasPermission, login, logout };
+  return { getSession, setSession, clearSession, hasPermission, normalizeUsername, login, logout };
 })();
 
 // ── Login Handler ─────────────────────────────────────────────
 async function handleLogin() {
-  const username = document.getElementById('loginUser').value.trim();
+  const userInput = document.getElementById('loginUser');
+  const username = Auth.normalizeUsername(userInput.value);
   const password = document.getElementById('loginPass').value;
   const errEl    = document.getElementById('loginError');
   const btn      = document.querySelector('.btn-login');
 
   errEl.classList.add('hidden');
+  userInput.value = username;
 
   if (!username || !password) {
     errEl.textContent = '請輸入帳號與密碼';

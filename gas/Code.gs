@@ -5,7 +5,7 @@
 // ════════════════════════════════════════════════════════════
 
 const SPREADSHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
-const VERSION = '1.2.0';
+const VERSION = '1.3.1';
 
 const SHEETS = {
   USERS:'CRM_Users', CLIENTS:'CRM_Clients', VENDORS:'CRM_Vendors',
@@ -152,11 +152,16 @@ function hashPassword(password) {
   );
 }
 
+function normalizeUsername(value) {
+  return String(value || '').normalize('NFKC').trim().replace(/\s+/g, '').toLowerCase();
+}
+
 function login(p) {
-  const { username, password } = p;
+  const username = normalizeUsername(p.username);
+  const password = p.password;
   if (!username||!password) return { success:false, message:'請輸入帳號密碼' };
   const users = sheetToObjects(getSheet(SHEETS.USERS));
-  const user = users.find(u => u.username===username && u.status==='啟用');
+  const user = users.find(u => normalizeUsername(u.username)===username && u.status==='啟用');
   if (!user) return { success:false, message:'帳號不存在或已停用' };
   if (user.passwordHash !== hashPassword(password)) return { success:false, message:'密碼錯誤' };
   // Update lastLogin
