@@ -1,11 +1,11 @@
 // ════════════════════════════════════════════════════════════
-// imPR CRM — Google Apps Script Backend  v1.0.0
+// imPR CRM — Google Apps Script Backend  v1.4.0
 // 部署：Google Sheets > 擴充功能 > Apps Script > 新增部署
 // 設定：類型=網頁應用程式 / 執行身分=我 / 存取=所有人
 // ════════════════════════════════════════════════════════════
 
 const SPREADSHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
-const VERSION = '1.3.1';
+const VERSION = '1.4.0';
 
 const SHEETS = {
   USERS:'CRM_Users', CLIENTS:'CRM_Clients', VENDORS:'CRM_Vendors',
@@ -16,15 +16,16 @@ const SHEETS = {
 
 // ── Entry Points ─────────────────────────────────────────────
 function doGet(e) {
+  const callback = e && e.parameter ? e.parameter.callback : '';
   try {
     const p = e.parameter;
     const params = {};
     Object.keys(p).forEach(k => {
       try { params[k] = JSON.parse(p[k]); } catch { params[k] = p[k]; }
     });
-    return jsonResponse(routeAction(params.action, params));
+    return webResponse(routeAction(params.action, params), callback);
   } catch(err) {
-    return jsonResponse({ success:false, message:err.message });
+    return webResponse({ success:false, message:err.message }, callback);
   }
 }
 
@@ -40,6 +41,16 @@ function doPost(e) {
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// JSONP 備援可避開部分 Safari／企業網路的跨網域 fetch 限制。
+function webResponse(data, callback) {
+  if (!callback) return jsonResponse(data);
+  if (!/^[A-Za-z_$][0-9A-Za-z_$]*$/.test(callback)) {
+    return jsonResponse({ success:false, message:'Invalid callback' });
+  }
+  return ContentService.createTextOutput(callback+'('+JSON.stringify(data)+');')
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
 
 // ── Router ───────────────────────────────────────────────────
