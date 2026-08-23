@@ -5,13 +5,13 @@
 // ════════════════════════════════════════════════════════════
 
 const SPREADSHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
-const VERSION = '1.0.0';
+const VERSION = '1.2.0';
 
 const SHEETS = {
-  USERS:'Users', CLIENTS:'Clients', VENDORS:'Vendors',
-  CONTACTS:'Contacts', PROJECTS:'Projects', ACTIVITIES:'Activities',
-  EVALUATIONS:'Evaluations', TAGS:'Tags', CATEGORIES:'Categories',
-  FILES:'Files', SETTINGS:'Settings',
+  USERS:'CRM_Users', CLIENTS:'CRM_Clients', VENDORS:'CRM_Vendors',
+  CONTACTS:'CRM_Contacts', PROJECTS:'CRM_Projects', ACTIVITIES:'CRM_Activities',
+  EVALUATIONS:'CRM_Evaluations', TAGS:'CRM_Tags', CATEGORIES:'CRM_Categories',
+  FILES:'CRM_Files', SETTINGS:'CRM_Settings',
 };
 
 // ── Entry Points ─────────────────────────────────────────────
@@ -400,7 +400,8 @@ function initHeaders(sheet, name) {
     Files:       ['id','entityType','entityId','name','url','size','mimeType','uploadedAt','uploadedBy'],
     Settings:    ['key','value','updatedAt'],
   };
-  const h = H[name];
+  const logicalName = name.replace(/^CRM_/, '');
+  const h = H[logicalName];
   if (h) {
     sheet.getRange(1,1,1,h.length).setValues([h])
       .setBackground('#0D1117').setFontColor('#E8681A').setFontWeight('bold');

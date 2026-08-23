@@ -6,26 +6,26 @@
 const CONFIG = {
   // ── Google Apps Script Web App URL ──────────────────────────
   // 部署後貼上您的 GAS Deployment URL
-  GAS_ENDPOINT: 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec',
+  GAS_ENDPOINT: 'https://script.google.com/macros/s/AKfycby8cwHcoir8mSu_H7Eg1GIaoKSI0gVvg3MGFNrVosK5eIPe3UQ9AelWhDFNDWPXaKDfFQ/exec',
 
   // ── System Info ──────────────────────────────────────────────
   APP_NAME: 'imPR CRM',
-  APP_VERSION: '1.1.0',
+  APP_VERSION: '1.2.0',
   COMPANY: '新動力公共關係顧問股份有限公司',
 
   // ── Spreadsheet Sheet Names ──────────────────────────────────
   SHEETS: {
-    USERS:       'Users',
-    CLIENTS:     'Clients',
-    VENDORS:     'Vendors',
-    CONTACTS:    'Contacts',
-    PROJECTS:    'Projects',
-    ACTIVITIES:  'Activities',
-    EVALUATIONS: 'Evaluations',
-    TAGS:        'Tags',
-    CATEGORIES:  'Categories',
-    FILES:       'Files',
-    SETTINGS:    'Settings',
+    USERS:       'CRM_Users',
+    CLIENTS:     'CRM_Clients',
+    VENDORS:     'CRM_Vendors',
+    CONTACTS:    'CRM_Contacts',
+    PROJECTS:    'CRM_Projects',
+    ACTIVITIES:  'CRM_Activities',
+    EVALUATIONS: 'CRM_Evaluations',
+    TAGS:        'CRM_Tags',
+    CATEGORIES:  'CRM_Categories',
+    FILES:       'CRM_Files',
+    SETTINGS:    'CRM_Settings',
   },
 
   // ── Pagination ───────────────────────────────────────────────

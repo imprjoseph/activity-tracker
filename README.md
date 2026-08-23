@@ -61,19 +61,21 @@ gas/
 
 **初始化後會自動建立以下工作表：**
 
+為了能與既有的案件追蹤資料共用同一份 Google Sheet，CRM 分頁統一使用 `CRM_` 前綴。
+
 | 工作表名稱 | 用途 |
 |-----------|------|
-| `Users` | 系統使用者帳號 |
-| `Clients` | 客戶資料 |
-| `Vendors` | 供應商資料 |
-| `Contacts` | 聯絡人 |
-| `Projects` | 專案關聯 |
-| `Activities` | 追蹤紀錄 |
-| `Evaluations` | 供應商評價 |
-| `Tags` | 標籤管理 |
-| `Categories` | 分類管理 |
-| `Files` | 附件記錄 |
-| `Settings` | 系統設定 |
+| `CRM_Users` | 系統使用者帳號 |
+| `CRM_Clients` | 客戶資料 |
+| `CRM_Vendors` | 供應商資料 |
+| `CRM_Contacts` | 聯絡人 |
+| `CRM_Projects` | 專案關聯 |
+| `CRM_Activities` | 追蹤紀錄 |
+| `CRM_Evaluations` | 供應商評價 |
+| `CRM_Tags` | 標籤管理 |
+| `CRM_Categories` | 分類管理 |
+| `CRM_Files` | 附件記錄 |
+| `CRM_Settings` | 系統設定 |
 
 ### Step 4：設定前端 GAS URL
 
@@ -134,7 +136,7 @@ GAS_ENDPOINT: 'https://script.google.com/macros/s/AKfycbx...你的ID.../exec',
 
 ## 📊 Google Sheets 資料欄位說明
 
-### Clients 工作表欄位
+### CRM_Clients 工作表欄位
 
 | 欄位 | 說明 | 範例 |
 |------|------|------|
@@ -154,7 +156,7 @@ GAS_ENDPOINT: 'https://script.google.com/macros/s/AKfycbx...你的ID.../exec',
 | createdAt | 建立時間 | `2025-05-10 14:30:00` |
 | updatedAt | 更新時間 | `2025-05-10 14:30:00` |
 
-### Vendors 工作表欄位
+### CRM_Vendors 工作表欄位
 
 | 欄位 | 說明 | 範例 |
 |------|------|------|
@@ -189,7 +191,7 @@ A:
 A: 請確認已執行「初始化系統工作表」，建立正確的欄位標頭。
 
 ### Q: 如何新增系統使用者？
-A: 直接在 Google Sheets 的 `Users` 工作表新增一行，`passwordHash` 欄填入密碼的 SHA-256+salt 雜湊值。可在 GAS 編輯器執行 `hashPassword('你的密碼')` 取得。
+A: 直接在 Google Sheets 的 `CRM_Users` 工作表新增一行，`passwordHash` 欄填入密碼的 SHA-256+salt 雜湊值。可在 GAS 編輯器執行 `hashPassword('你的密碼')` 取得。
 
 ### Q: 可以自訂客戶分類嗎？
 A: 
@@ -258,4 +260,4 @@ impr-crm/
 系統由 imPR 內部開發維護。  
 如有問題請聯繫系統管理員。
 
-© 2025 新動力公共關係顧問股份有限公司 · 內部使用，請勿對外散布
+© 2026 新動力公共關係顧問股份有限公司 · 內部使用，請勿對外散布
