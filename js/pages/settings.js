@@ -158,6 +158,10 @@ const SettingsPage = {
     const users = LocalDB.getUsers();
     return `
       <div class="settings-section-title">👥 使用者管理</div>
+      <div class="plaintext-password-note">
+        <strong>密碼採明碼顯示</strong>
+        <span>僅限授權管理者於內部環境查看，請避免在公開場合開啟此頁。</span>
+      </div>
       <div style="margin-bottom:16px;display:flex;justify-content:flex-end">
         <button class="btn-primary" onclick="SettingsPage.openAddUser()">＋ 新增使用者</button>
       </div>
@@ -179,8 +183,8 @@ const SettingsPage = {
                   </div>
                 </td>
                 <td style="font-family:var(--font-mono);font-size:0.82rem">${Utils.escapeHtml(u.username)}</td>
-                <td style="font-family:var(--font-mono);font-size:0.82rem;color:var(--text-muted)">
-                  ${'•'.repeat(Math.min(u.password?.length||8, 10))}
+                <td>
+                  <span class="password-plaintext">${Utils.escapeHtml(u.password || '—')}</span>
                 </td>
                 <td><span class="chip chip-potential">${CONFIG.ROLES[u.role]?.label||u.role}</span></td>
                 <td>

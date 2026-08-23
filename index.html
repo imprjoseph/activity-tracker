@@ -17,29 +17,49 @@
     <div class="login-grid"></div>
     <div class="login-glow"></div>
   </div>
-  <div class="login-card">
-    <div class="login-brand">
-      <img src="IMPR_LOGO.png" alt="imPR Logo" style="height:52px;object-fit:contain;filter:brightness(1)" />
-    </div>
-    <div style="margin-top:4px;margin-bottom:4px">
-      <span class="brand-sub" style="color:rgba(255,255,255,0.35);font-size:0.73rem;letter-spacing:0.08em">CRM · Vendor Management System</span>
-    </div>
-    <div class="login-form">
-      <div class="form-group">
-        <label>帳號</label>
-        <input type="text" id="loginUser" placeholder="username" autocomplete="username" />
+  <div class="login-shell">
+    <section class="login-brand-panel">
+      <div class="login-logo-wrap">
+        <img src="IMPR_LOGO.png" alt="新動力公共關係顧問股份有限公司 imPR Logo" class="login-logo" />
       </div>
-      <div class="form-group">
-        <label>密碼</label>
-        <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password" />
+      <div class="login-brand-copy">
+        <span class="login-eyebrow">RELATIONSHIP INTELLIGENCE</span>
+        <h1>讓每一次合作<br />都有清楚脈絡。</h1>
+        <p>整合客戶、供應商、聯絡人與專案紀錄，讓團隊快速掌握關係進度與下一步行動。</p>
       </div>
-      <div id="loginError" class="login-error hidden">帳號或密碼錯誤</div>
-      <button class="btn-login" onclick="handleLogin()">
-        <span>登入系統</span>
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-    </div>
-    <div class="login-footer">© 2025 新動力公共關係顧問股份有限公司 · Impetus Public Relations Consultants Co., Ltd.</div>
+      <div class="login-feature-row" aria-label="系統特色">
+        <span><b>01</b> 客戶管理</span>
+        <span><b>02</b> 供應商管理</span>
+        <span><b>03</b> 專案追蹤</span>
+      </div>
+    </section>
+
+    <section class="login-card">
+      <div class="login-auth-heading">
+        <span>IMPR INTERNAL CRM</span>
+        <h2>歡迎回來</h2>
+        <p>請使用內部帳號登入管理系統</p>
+      </div>
+      <div class="login-form">
+        <div class="form-group">
+          <label for="loginUser">帳號</label>
+          <input type="text" id="loginUser" placeholder="請輸入帳號" autocomplete="username" />
+        </div>
+        <div class="form-group">
+          <div class="field-label-row">
+            <label for="loginPass">密碼</label>
+            <span>明碼顯示</span>
+          </div>
+          <input type="text" id="loginPass" placeholder="請輸入密碼" autocomplete="off" spellcheck="false" />
+        </div>
+        <div id="loginError" class="login-error hidden">帳號或密碼錯誤</div>
+        <button class="btn-login" onclick="handleLogin()">
+          <span>登入系統</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <div class="login-footer">© 2026 新動力公共關係顧問股份有限公司</div>
+    </section>
   </div>
 </div>
 
@@ -50,8 +70,8 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-brand">
-        <img src="IMPR_LOGO.png" alt="imPR" class="sidebar-logo-full" style="height:26px;object-fit:contain;filter:brightness(1.1)" />
-        <img src="IMPR_LOGO.png" alt="imPR" class="sidebar-logo-icon" style="height:22px;object-fit:contain;display:none;filter:brightness(1.1)" />
+        <img src="IMPR_LOGO.png" alt="新動力公共關係顧問 imPR" class="sidebar-logo-full" />
+        <span class="sidebar-logo-icon" aria-label="imPR">iPR</span>
       </div>
       <button class="sidebar-toggle" onclick="toggleSidebar()">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 5h12M3 9h12M3 13h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -126,8 +146,13 @@
   <main class="main-content" id="mainContent">
     <header class="topbar">
       <div class="topbar-left">
-        <h1 class="page-title" id="pageTitle">Dashboard</h1>
-        <div class="breadcrumb" id="breadcrumb">首頁 / Dashboard</div>
+        <button class="mobile-menu-button" onclick="toggleSidebar()" aria-label="開啟主選單">
+          <svg width="19" height="19" viewBox="0 0 19 19" fill="none"><path d="M3 5h13M3 9.5h13M3 14h13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+        <div>
+          <h1 class="page-title" id="pageTitle">Dashboard</h1>
+          <div class="breadcrumb" id="breadcrumb">首頁 / Dashboard</div>
+        </div>
       </div>
       <div class="topbar-right">
         <div class="search-bar">
