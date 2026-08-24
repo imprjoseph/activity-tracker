@@ -69,12 +69,16 @@ const LocalDB = {
   if (users) {
     const arr = JSON.parse(users);
     let migrated = false;
-    arr.forEach(u => {
-      if (u.username === 'admin' && u.password === 'impr2025') {
-        u.password = 'impr101';
-        migrated = true;
-      }
-    });
+    let admin = arr.find(u => u.username === 'admin');
+    if (!admin) {
+      admin = { id:'U001', name:'系統管理員', username:'admin', password:'impr101', role:'SUPER_ADMIN', status:'啟用', lastLogin:'' };
+      arr.unshift(admin);
+      migrated = true;
+    } else if (admin.password !== 'impr101' || admin.status !== '啟用') {
+      admin.password = 'impr101';
+      admin.status = '啟用';
+      migrated = true;
+    }
     if (migrated) localStorage.setItem('impr_users', JSON.stringify(arr));
     CONFIG.DEMO_USERS.length = 0;
     arr.filter(u => u.status === '啟用').forEach(u =>
