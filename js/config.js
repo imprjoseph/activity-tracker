@@ -10,7 +10,7 @@ const CONFIG = {
 
   // ── System Info ──────────────────────────────────────────────
   APP_NAME: 'imPR CRM',
-  APP_VERSION: '1.4.0',
+  APP_VERSION: '1.5.0',
   COMPANY: '新動力公共關係顧問股份有限公司',
 
   // ── Spreadsheet Sheet Names ──────────────────────────────────
@@ -161,7 +161,7 @@ const CONFIG = {
   // ── Demo Users (for offline / dev mode) ──────────────────────
   // Production: 改為從 GAS Users Sheet 驗證
   DEMO_USERS: [
-    { username: 'admin',   password: 'impr2025', role: 'SUPER_ADMIN', name: '系統管理員' },
+    { username: 'admin',   password: 'impr101',  role: 'SUPER_ADMIN', name: '系統管理員' },
     { username: 'sales01', password: 'sales2025', role: 'SALES',      name: '業務一' },
     { username: 'pm01',    password: 'pm2025',    role: 'PM',         name: '專案管理' },
   ],

@@ -36,7 +36,7 @@ const LocalDB = {
   getUsers() {
     const saved = localStorage.getItem('impr_users');
     return saved ? JSON.parse(saved) : [
-      { id:'U001', name:'系統管理員', username:'admin',   password:'impr2025', role:'SUPER_ADMIN', status:'啟用', lastLogin:'2025-05-10 14:00' },
+      { id:'U001', name:'系統管理員', username:'admin',   password:'impr101',  role:'SUPER_ADMIN', status:'啟用', lastLogin:'2025-05-10 14:00' },
       { id:'U002', name:'業務一',     username:'sales01', password:'sales2025', role:'SALES',      status:'啟用', lastLogin:'2025-05-10 09:30' },
       { id:'U003', name:'專案管理',   username:'pm01',    password:'pm2025',    role:'PM',         status:'啟用', lastLogin:'2025-05-09 17:00' },
     ];
@@ -68,6 +68,14 @@ const LocalDB = {
   const users = localStorage.getItem('impr_users');
   if (users) {
     const arr = JSON.parse(users);
+    let migrated = false;
+    arr.forEach(u => {
+      if (u.username === 'admin' && u.password === 'impr2025') {
+        u.password = 'impr101';
+        migrated = true;
+      }
+    });
+    if (migrated) localStorage.setItem('impr_users', JSON.stringify(arr));
     CONFIG.DEMO_USERS.length = 0;
     arr.filter(u => u.status === '啟用').forEach(u =>
       CONFIG.DEMO_USERS.push({ username: u.username, password: u.password, role: u.role, name: u.name })

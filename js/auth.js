@@ -47,9 +47,12 @@ const Auth = (() => {
 
     // Step 1：本機帳號驗證（永遠有效，包含 GAS 連線後）
     const localUser = CONFIG.DEMO_USERS.find(
-      u => normalizeUsername(u.username) === normalizedUsername && u.password === password
+      u => normalizeUsername(u.username) === normalizedUsername
     );
     if (localUser) {
+      if (localUser.password !== password) {
+        return { success: false, message: '密碼錯誤' };
+      }
       const sessionUser = {
         username: localUser.username,
         name:     localUser.name,
@@ -77,7 +80,7 @@ const Auth = (() => {
         return { success: false, message: res?.message || '帳號或密碼錯誤' };
       } catch (e) {
         console.warn('[Auth] GAS login failed:', e.message);
-        const networkError = /Failed to fetch|NetworkError|Load failed/i.test(e.message || '');
+        const networkError = /Failed to fetch|NetworkError|Load failed|JSONP/i.test(e.message || '');
         return {
           success: false,
           message: networkError
