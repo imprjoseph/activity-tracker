@@ -41,11 +41,24 @@ const Auth = (() => {
     return role.permissions.includes(perm);
   }
 
-  // ── Login：先比對本機帳號，再由 GAS Users Sheet 驗證 ──────────
+  // ── Login：帳號驗證完全在前端完成，不依賴跨網域 GAS ──────────
   async function login(username, password) {
     const normalizedUsername = normalizeUsername(username);
 
-    // Step 1：本機帳號驗證（永遠有效，包含 GAS 連線後）
+    // 管理員帳號與 Google Sheet CRM_Users 的明碼設定保持一致。
+    // 放在 localStorage 之前，避免瀏覽器殘留舊設定造成登入失敗。
+    if (normalizedUsername === 'admin') {
+      if (password !== 'impr101') return { success: false, message: '密碼錯誤' };
+      const adminUser = {
+        username: 'admin',
+        name: '系統管理員',
+        role: 'SUPER_ADMIN',
+      };
+      setSession(adminUser);
+      return { success: true, user: adminUser };
+    }
+
+    // 其他帳號使用本機「系統設定 → 使用者管理」資料。
     const localUser = CONFIG.DEMO_USERS.find(
       u => normalizeUsername(u.username) === normalizedUsername
     );
@@ -61,36 +74,7 @@ const Auth = (() => {
       setSession(sessionUser);
       return { success: true, user: sessionUser };
     }
-
-    // Step 2：若本機驗證失敗 + GAS 已連線，嘗試 GAS Users Sheet
-    const hasGAS = typeof API !== 'undefined' && !API.getStatus().isDemoMode;
-
-    if (hasGAS) {
-      try {
-        const res = await Promise.race([
-          API.call('login', { username: normalizedUsername, password }),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('GAS 連線逾時（8秒）')), 8000)
-          ),
-        ]);
-        if (res && res.success) {
-          setSession(res.user);
-          return { success: true, user: res.user };
-        }
-        return { success: false, message: res?.message || '帳號或密碼錯誤' };
-      } catch (e) {
-        console.warn('[Auth] GAS login failed:', e.message);
-        const networkError = /Failed to fetch|NetworkError|Load failed|JSONP/i.test(e.message || '');
-        return {
-          success: false,
-          message: networkError
-            ? '無法連線至帳號資料庫，請確認網路後再試'
-            : `登入服務暫時無法使用：${e.message}`,
-        };
-      }
-    }
-
-    return { success: false, message: '帳號或密碼錯誤' };
+    return { success: false, message: '帳號不存在' };
   }
 
   function logout() {
