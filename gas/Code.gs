@@ -1,11 +1,11 @@
 // ════════════════════════════════════════════════════════════
-// imPR CRM — Google Apps Script Backend  v1.4.0
+// imPR CRM — Google Apps Script Backend  v1.5.0
 // 部署：Google Sheets > 擴充功能 > Apps Script > 新增部署
 // 設定：類型=網頁應用程式 / 執行身分=我 / 存取=所有人
 // ════════════════════════════════════════════════════════════
 
 const SPREADSHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 
 const SHEETS = {
   USERS:'CRM_Users', CLIENTS:'CRM_Clients', VENDORS:'CRM_Vendors',
@@ -157,12 +157,6 @@ function ping() {
   return { success:true, message:'pong', version:VERSION, timestamp:now() };
 }
 
-function hashPassword(password) {
-  return Utilities.base64Encode(
-    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, password+'impr_salt_2025')
-  );
-}
-
 function normalizeUsername(value) {
   return String(value || '').normalize('NFKC').trim().replace(/\s+/g, '').toLowerCase();
 }
@@ -174,7 +168,7 @@ function login(p) {
   const users = sheetToObjects(getSheet(SHEETS.USERS));
   const user = users.find(u => normalizeUsername(u.username)===username && u.status==='啟用');
   if (!user) return { success:false, message:'帳號不存在或已停用' };
-  if (user.passwordHash !== hashPassword(password)) return { success:false, message:'密碼錯誤' };
+  if (String(user.password || '') !== String(password)) return { success:false, message:'密碼錯誤' };
   // Update lastLogin
   try { updateRow(SHEETS.USERS, user.id, { lastLogin:now() }); } catch(e){}
   return { success:true, user:{ id:user.id, username:user.username, name:user.name, role:user.role, email:user.email } };
@@ -404,7 +398,7 @@ function createTag(name) {
 // ── Sheet Headers ────────────────────────────────────────────
 function initHeaders(sheet, name) {
   const H = {
-    Users:       ['id','username','passwordHash','name','role','email','status','lastLogin','createdAt'],
+    Users:       ['id','username','password','name','role','email','status','lastLogin','createdAt'],
     Clients:     ['id','name','nameEn','taxId','category','level','industry','status','phone','email','website','address','region','logoUrl','notes','tags','contacts','projects','createdAt','updatedAt','createdBy'],
     Vendors:     ['id','name','taxId','category','status','region','contactName','contactPhone','contactEmail','contactLine','address','payment','bankName','bankAccount','bankLast4','rating','ratingPunctual','ratingQuality','ratingPrice','projects','notes','tags','contractStatus','createdAt','updatedAt','createdBy'],
     Contacts:    ['id','companyId','companyType','name','title','dept','phone','email','line','wechat','isPrimary','notes','createdAt','updatedAt'],
@@ -433,7 +427,7 @@ function setupSheets() {
   const usersSheet = getSheet(SHEETS.USERS);
   if (!sheetToObjects(usersSheet).find(u=>u.username==='admin')) {
     usersSheet.appendRow([
-      generateId('U'),'admin',hashPassword('impr2025'),
+      generateId('U'),'admin','impr101',
       '系統管理員','SUPER_ADMIN','admin@impr.com.tw','啟用','',now()
     ]);
   }
@@ -445,7 +439,7 @@ function setupSheets() {
     });
   }
 
-  SpreadsheetApp.getUi().alert('✅ imPR CRM 初始化完成！\n預設管理員帳號：admin\n預設密碼：impr2025\n\n請在部署後立即修改密碼。');
+  SpreadsheetApp.getUi().alert('✅ imPR CRM 初始化完成！\n預設管理員帳號：admin\n預設密碼：impr101\n\n密碼以明碼儲存，請限制試算表存取權限。');
 }
 
 function onOpen() {

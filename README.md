@@ -113,7 +113,7 @@ GAS_ENDPOINT: 'https://script.google.com/macros/s/AKfycbx...你的ID.../exec',
 
 | 帳號 | 密碼 | 角色 | 備註 |
 |------|------|------|------|
-| `admin` | `impr2025` | Super Admin | **請部署後立即修改** |
+| `admin` | `impr101` | Super Admin | 密碼採明碼儲存 |
 
 ---
 
@@ -191,7 +191,7 @@ A:
 A: 請確認已執行「初始化系統工作表」，建立正確的欄位標頭。
 
 ### Q: 如何新增系統使用者？
-A: 直接在 Google Sheets 的 `CRM_Users` 工作表新增一行，`passwordHash` 欄填入密碼的 SHA-256+salt 雜湊值。可在 GAS 編輯器執行 `hashPassword('你的密碼')` 取得。
+A: 直接在 Google Sheets 的 `CRM_Users` 工作表新增一行，於 `password` 欄填入明碼密碼。請限制試算表共用權限，避免密碼外洩。
 
 ### Q: 可以自訂客戶分類嗎？
 A: 
